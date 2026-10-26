@@ -1,0 +1,145 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>
+        {% block title %}Federated Healthcare{% endblock %}
+    </title>
+
+    <link rel="stylesheet" href="{% static 'css/app.css' %}">
+</head>
+
+<body>
+
+{% if user.is_authenticated %}
+
+<div class="app-shell">
+
+    <aside class="sidebar">
+
+        <a class="brand" href="{% url 'dashboard' %}">
+            <span class="brand-mark">FH</span>
+            <span>
+                Federated<br>
+                Healthcare
+            </span>
+        </a>
+
+        <div class="user-mini">
+            <strong>
+                {{ user.first_name|default:user.username }}
+            </strong>
+
+            <small>
+                {% if user.profile.role == 'HOSPITAL' %}
+                    {{ user.profile.organization }}
+                {% elif user.profile.role == 'ADMIN' %}
+                    System Administrator
+                {% else %}
+                    Patient Portal
+                {% endif %}
+            </small>
+        </div>
+
+        <nav>
+
+            {% if user.profile.role == 'PATIENT' %}
+
+                <a href="{% url 'patient_dashboard' %}">
+                    Dashboard
+                </a>
+
+                <a href="{% url 'patient_predict' %}">
+                    New Prediction
+                </a>
+
+                <a href="{% url 'patient_history' %}">
+                    Previous Records
+                </a>
+
+            {% elif user.profile.role == 'HOSPITAL' %}
+
+                <a href="{% url 'hospital_dashboard' %}">
+                    Dashboard
+                </a>
+
+                <a href="{% url 'hospital_upload' %}">
+                    Upload Dataset
+                </a>
+
+                <a href="{% url 'hospital_history' %}">
+                    Submission History
+                </a>
+
+            {% else %}
+
+                <a href="{% url 'admin_dashboard' %}">
+                    Dashboard
+                </a>
+
+                <a href="{% url 'admin_rounds' %}">
+                    Global Model Creation
+                </a>
+
+                <a href="{% url 'admin_model_history' %}">
+                    Model History
+                </a>
+
+                <a href="{% url 'admin_hospitals' %}">
+                    Hospital Submissions
+                </a>
+
+                <a href="{% url 'admin_patients' %}">
+                    Patient Records
+                </a>
+
+            {% endif %}
+
+        </nav>
+
+        <div class="sidebar-bottom">
+            <a href="{% url 'logout' %}">
+                Logout
+            </a>
+        </div>
+
+    </aside>
+
+    <main class="main">
+
+        {% if messages %}
+            {% for message in messages %}
+                <div class="toast {{ message.tags }}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+
+{% else %}
+
+    <main class="auth-page">
+
+{% endif %}
+
+
+{% block content %}
+{% endblock %}
+
+
+{% if user.is_authenticated %}
+
+    </main>
+</div>
+
+{% else %}
+
+    </main>
+
+{% endif %}
+
+</body>
+</html>

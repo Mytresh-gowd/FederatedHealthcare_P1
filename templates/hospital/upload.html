@@ -1,0 +1,519 @@
+{% extends 'base.html' %}
+{% load form_extras %}
+{% block title %}Upload Dataset{% endblock %}
+
+{% block content %}
+
+<div class="page-head">
+    <div>
+        <span class="eyebrow">HOSPITAL PORTAL / LOCAL TRAINING</span>
+        <h1>Upload a new hospital dataset</h1>
+        <p class="muted">
+            Analyze your uploaded dataset, explore its disease-class
+            distribution, and train a local Random Forest model.
+        </p>
+    </div>
+</div>
+
+{% if error %}
+    <div class="alert error">{{ error }}</div>
+{% endif %}
+
+<form method="post"
+      enctype="multipart/form-data"
+      class="card upload-card">
+    {% csrf_token %}
+
+    <div class="dropzone">
+        <div class="upload-icon">↑</div>
+        <h2>Choose CSV dataset</h2>
+        <p>
+            Required schema: the model's 31 input features plus
+            <code>sublabel</code>.
+        </p>
+        <input type="file"
+               name="dataset"
+               accept=".csv"
+               required>
+    </div>
+
+    <button type="submit" class="btn primary">
+        Analyze &amp; train local model
+    </button>
+</form>
+
+{% if metric %}
+
+<section class="card dataset-result">
+
+    <div class="card-head">
+        <div>
+            <span class="eyebrow">LOCAL MODEL READY</span>
+            <h2>{{ metric.filename }}</h2>
+            <p class="muted">Federated Round #{{ metric.round_no }}</p>
+        </div>
+
+        <span class="result-pill">Training complete</span>
+    </div>
+
+    <!-- Dataset summary cards -->
+    <div class="summary-grid">
+
+        <div class="summary-item">
+            <span>Total records</span>
+            <b>{{ metric.records }}</b>
+        </div>
+
+        <div class="summary-item">
+            <span>Unique sublabels</span>
+            <b>{{ class_count }}</b>
+        </div>
+
+        <div class="summary-item">
+            <span>Local decision trees</span>
+            <b>{{ metric.trees }}</b>
+        </div>
+
+    </div>
+
+    <!-- Bar chart -->
+    <div class="chart-section">
+        <div class="section-heading">
+            <h3>Disease Class Distribution</h3>
+            <p class="muted">
+                Compare the number of records for each sublabel.
+                Hover over a bar to see its count and percentage.
+            </p>
+        </div>
+
+        <div class="chart-card bar-chart-card">
+            <canvas id="classBarChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Doughnut chart -->
+    <div class="chart-section">
+        <div class="section-heading">
+            <h3>Class Composition</h3>
+            <p class="muted">
+                Explore the percentage share of each class.
+            </p>
+        </div>
+
+        <div class="chart-card doughnut-card">
+            <div class="doughnut-canvas">
+                <canvas id="classDoughnutChart"></canvas>
+            </div>
+
+            <div id="classLegend" class="chart-legend"></div>
+        </div>
+    </div>
+
+    <!-- Detailed class table -->
+    <div class="class-summary">
+        <h3>Sublabel Details</h3>
+        <p class="muted">
+            Record counts and percentages in the uploaded dataset.
+        </p>
+
+        <div class="table-wrap">
+            <table class="class-table">
+                <thead>
+                    <tr>
+                        <th>Sublabel</th>
+                        <th>Record count</th>
+                        <th>Percentage</th>
+                    </tr>
+                </thead>
+
+                <tbody id="classTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Existing actions preserved -->
+    <div class="form-actions">
+        <a class="btn ghost"
+           href="{% url 'hospital_submission_detail' metric.id %}">
+            View analysis
+        </a>
+
+        <form method="post"
+              action="{% url 'hospital_submit' metric.id %}">
+            {% csrf_token %}
+
+            <button type="submit" class="btn primary">
+                Submit to global model
+            </button>
+        </form>
+    </div>
+
+</section>
+
+<!-- Safely pass Django data to JavaScript -->
+{{ chart_labels|json_script:"chart-labels-data" }}
+{{ chart_counts|json_script:"chart-counts-data" }}
+{{ chart_percentages|json_script:"chart-percentages-data" }}
+
+<style>
+.dataset-result {
+    margin-top: 26px;
+}
+
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    margin: 24px 0 30px;
+}
+
+.summary-item {
+    padding: 20px;
+    border: 1px solid var(--border-color, #e5e7eb);
+    border-radius: 14px;
+    background: var(--card-bg, #fff);
+}
+
+.summary-item span {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 13px;
+    color: var(--muted-color, #6b7280);
+}
+
+.summary-item b {
+    font-size: 25px;
+    overflow-wrap: anywhere;
+}
+
+.chart-section {
+    margin-top: 30px;
+}
+
+.section-heading {
+    margin-bottom: 15px;
+}
+
+.section-heading h3,
+.class-summary h3 {
+    margin-bottom: 6px;
+}
+
+.chart-card {
+    min-width: 0;
+    padding: 20px;
+    border: 1px solid var(--border-color, #e5e7eb);
+    border-radius: 14px;
+}
+
+.bar-chart-card {
+    height: 360px;
+}
+
+.doughnut-card {
+    display: grid;
+    grid-template-columns: minmax(200px, 1fr) minmax(180px, 1fr);
+    align-items: center;
+    gap: 24px;
+}
+
+.doughnut-canvas {
+    width: 100%;
+    max-width: 340px;
+    margin: auto;
+}
+
+.chart-legend {
+    display: grid;
+    gap: 12px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    font-size: 14px;
+}
+
+.legend-swatch {
+    width: 11px;
+    height: 11px;
+    flex-shrink: 0;
+    border-radius: 3px;
+}
+
+.legend-text {
+    overflow-wrap: anywhere;
+}
+
+.class-summary {
+    margin-top: 30px;
+}
+
+.table-wrap {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.class-table {
+    width: 100%;
+    margin-top: 14px;
+    border-collapse: collapse;
+}
+
+.class-table th,
+.class-table td {
+    padding: 13px 14px;
+    border-bottom: 1px solid var(--border-color, #e5e7eb);
+    text-align: left;
+}
+
+.class-table th {
+    font-size: 13px;
+    color: var(--muted-color, #6b7280);
+}
+
+.class-label {
+    display: inline-block;
+    padding: 5px 10px;
+    border-radius: 7px;
+    background: var(--soft-bg, #f3f4f6);
+    font-weight: 600;
+}
+
+.form-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 28px;
+}
+
+.form-actions form {
+    margin: 0;
+}
+
+@media (max-width: 650px) {
+    .summary-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .doughnut-card {
+        grid-template-columns: 1fr;
+    }
+
+    .form-actions {
+        justify-content: stretch;
+    }
+
+    .form-actions form,
+    .form-actions form button {
+        width: 100%;
+    }
+}
+</style>
+
+<!-- Chart.js library -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+    const labels = JSON.parse(
+        document.getElementById("chart-labels-data").textContent
+    );
+
+    const counts = JSON.parse(
+        document.getElementById("chart-counts-data").textContent
+    );
+
+    const percentages = JSON.parse(
+        document.getElementById("chart-percentages-data").textContent
+    );
+
+    const tableBody = document.getElementById("classTableBody");
+
+    // Create table rows from the same dataset used by the charts.
+    labels.forEach(function (label, index) {
+        const row = document.createElement("tr");
+
+        const labelCell = document.createElement("td");
+        const labelBadge = document.createElement("span");
+        labelBadge.className = "class-label";
+        labelBadge.textContent = label;
+        labelCell.appendChild(labelBadge);
+
+        const countCell = document.createElement("td");
+        countCell.textContent = counts[index].toLocaleString();
+
+        const percentageCell = document.createElement("td");
+        percentageCell.textContent = percentages[index] + "%";
+
+        row.appendChild(labelCell);
+        row.appendChild(countCell);
+        row.appendChild(percentageCell);
+
+        tableBody.appendChild(row);
+    });
+
+    if (labels.length === 0 || counts.length === 0) {
+        tableBody.innerHTML =
+            '<tr><td colspan="3">No class distribution data available.</td></tr>';
+        return;
+    }
+
+    if (typeof Chart === "undefined") {
+        document.querySelectorAll(".chart-card").forEach(function (card) {
+            card.textContent =
+                "Charts could not load. Check your internet connection.";
+        });
+        return;
+    }
+
+    const palette = [
+        "#6478D3",
+        "#3A9D8F",
+        "#E8AD5A",
+        "#D96C75",
+        "#8B6BC1",
+        "#4D9DC5",
+        "#A3A85A",
+        "#C58B65"
+    ];
+
+    const colors = labels.map(function (_, index) {
+        return palette[index % palette.length];
+    });
+
+    // Bar chart: record counts by sublabel.
+    new Chart(document.getElementById("classBarChart"), {
+        type: "bar",
+
+        data: {
+            labels: labels,
+            datasets: [{
+                label: "Records",
+                data: counts,
+                backgroundColor: colors,
+                borderRadius: 7,
+                maxBarThickness: 56
+            }]
+        },
+
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        precision: 0
+                    },
+                    title: {
+                        display: true,
+                        text: "Number of records"
+                    }
+                },
+
+                x: {
+                    title: {
+                        display: true,
+                        text: "Sublabel"
+                    }
+                }
+            },
+
+            plugins: {
+                legend: {
+                    display: false
+                },
+
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            const i = context.dataIndex;
+
+                            return (
+                                counts[i].toLocaleString() +
+                                " records (" + percentages[i] + "%)"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Doughnut chart: class proportions.
+    new Chart(document.getElementById("classDoughnutChart"), {
+        type: "doughnut",
+
+        data: {
+            labels: labels,
+            datasets: [{
+                data: counts,
+                backgroundColor: colors,
+                borderWidth: 2,
+                hoverOffset: 10
+            }]
+        },
+
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            cutout: "64%",
+
+            plugins: {
+                legend: {
+                    display: false
+                },
+
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            const i = context.dataIndex;
+
+                            return (
+                                context.label + ": " +
+                                counts[i].toLocaleString() +
+                                " records (" + percentages[i] + "%)"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Custom legend.
+    const legend = document.getElementById("classLegend");
+
+    labels.forEach(function (label, index) {
+        const item = document.createElement("div");
+        item.className = "legend-item";
+
+        const swatch = document.createElement("span");
+        swatch.className = "legend-swatch";
+        swatch.style.backgroundColor = colors[index];
+
+        const description = document.createElement("span");
+        description.className = "legend-text";
+        description.textContent =
+            label + ": " +
+            counts[index].toLocaleString() +
+            " (" + percentages[index] + "%)";
+
+        item.appendChild(swatch);
+        item.appendChild(description);
+        legend.appendChild(item);
+    });
+
+});
+</script>
+
+{% endif %}
+
+{% endblock %}

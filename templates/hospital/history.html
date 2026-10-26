@@ -1,0 +1,463 @@
+{% extends 'base.html' %}
+{% load form_extras %}
+
+{% block title %}Submission History{% endblock %}
+
+{% block content %}
+
+<div class="page-head">
+    <div>
+        <span class="eyebrow">HOSPITAL PORTAL</span>
+        <h1>Submission history</h1>
+        <p class="muted">
+            Review your previous local training submissions and
+            explore each dataset's disease-class distribution.
+        </p>
+    </div>
+</div>
+
+{% if history_charts %}
+
+<div class="history-list">
+
+    {% for chart in history_charts %}
+    {% with s=chart.item %}
+
+    <section class="card submission-card">
+
+        <!-- Submission information -->
+        <div class="submission-header">
+            <div class="submission-title">
+                <span class="eyebrow">
+                    ROUND #{{ s.round_no }}
+                </span>
+
+                <h2>{{ s.filename }}</h2>
+
+                <p class="muted">
+                    {{ s.submitted_at|default:s.created_at|date:'d M Y, H:i' }}
+                </p>
+            </div>
+
+            <span class="badge">{{ s.status }}</span>
+        </div>
+
+        
+        <!-- Summary cards -->
+        <div class="history-stats">
+
+            <div class="history-stat">
+                <span>Total records</span>
+                <strong>{{ s.records }}</strong>
+            </div>
+
+            <div class="history-stat">
+                <span>Unique sublabels</span>
+                <strong>{{ chart.class_count }}</strong>
+            </div>
+
+        </div>
+
+
+        {% if chart.class_rows %}
+
+        <!-- Charts -->
+        <div class="history-charts">
+
+            <div class="history-chart-panel">
+                <h3>Disease Class Distribution</h3>
+
+                <p class="muted">
+                    Compare the number of records in each sublabel.
+                    Hover over a bar to view its count and percentage.
+                </p>
+
+                <div class="history-bar-wrap">
+                    <canvas id="{{ chart.bar_chart_id }}"></canvas>
+                </div>
+            </div>
+
+            <div class="history-chart-panel">
+                <h3>Class Composition</h3>
+
+                <p class="muted">
+                    Percentage share of each class.
+                </p>
+
+                <div class="history-doughnut-wrap">
+                    <canvas id="{{ chart.doughnut_chart_id }}"></canvas>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Sublabel details -->
+        <details class="distribution-details">
+            <summary>View sublabel counts and percentages</summary>
+
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Sublabel</th>
+                            <th>Records</th>
+                            <th>Percentage</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {% for row in chart.class_rows %}
+                        <tr>
+                            <td>{{ row.label }}</td>
+                            <td>{{ row.count }}</td>
+                            <td>{{ row.percentage }}%</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </details>
+
+        {% else %}
+
+        <p class="muted">
+            Class distribution is unavailable for this submission.
+        </p>
+
+        {% endif %}
+
+        <!-- Existing detail-page link -->
+        <div class="submission-actions">
+            <a class="btn small ghost"
+               href="{% url 'hospital_submission_detail' s.id %}">
+                View more
+            </a>
+        </div>
+
+        <!-- Safely embed this submission's chart data -->
+        {{ chart.chart_data|json_script:chart.chart_data_id }}
+
+    </section>
+
+    {% endwith %}
+    {% endfor %}
+
+</div>
+
+{% else %}
+
+<section class="card">
+    <p class="empty-cell">No submissions yet.</p>
+</section>
+
+{% endif %}
+
+
+<style>
+.history-list {
+    display: grid;
+    gap: 24px;
+}
+
+.submission-card {
+    min-width: 0;
+}
+
+.submission-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 22px;
+}
+
+.submission-title {
+    min-width: 0;
+}
+
+.submission-title h2 {
+    margin: 8px 0;
+    overflow-wrap: anywhere;
+}
+
+.history-stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 28px;
+}
+
+.history-stat {
+    padding: 16px;
+    border: 1px solid var(--border-color, #e5e7eb);
+    border-radius: 12px;
+}
+
+.history-stat span {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--muted-color, #6b7280);
+    font-size: 13px;
+}
+
+.history-stat strong {
+    font-size: 21px;
+    overflow-wrap: anywhere;
+}
+
+.history-charts {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    gap: 18px;
+}
+
+.history-chart-panel {
+    min-width: 0;
+    padding: 18px;
+    border: 1px solid var(--border-color, #e5e7eb);
+    border-radius: 14px;
+}
+
+.history-chart-panel h3 {
+    margin: 0 0 6px;
+}
+
+.history-chart-panel p {
+    margin-bottom: 18px;
+    font-size: 13px;
+}
+
+.history-bar-wrap {
+    position: relative;
+    height: 280px;
+}
+
+.history-doughnut-wrap {
+    position: relative;
+    height: 280px;
+    max-width: 310px;
+    margin: auto;
+}
+
+.distribution-details {
+    margin-top: 22px;
+    padding: 14px;
+    border: 1px solid var(--border-color, #e5e7eb);
+    border-radius: 10px;
+}
+
+.distribution-details summary {
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.distribution-details .table-wrap {
+    margin-top: 12px;
+    overflow-x: auto;
+}
+
+.distribution-details table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.distribution-details th,
+.distribution-details td {
+    padding: 11px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color, #e5e7eb);
+}
+
+.submission-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 22px;
+}
+
+@media (max-width: 800px) {
+    .history-stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .history-charts {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    .submission-header {
+        flex-direction: column;
+    }
+}
+</style>
+
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+    if (typeof Chart === "undefined") {
+        document.querySelectorAll(".history-chart-panel").forEach(
+            function (panel) {
+                panel.insertAdjacentText(
+                    "beforeend",
+                    " Charts could not load. Check your internet connection."
+                );
+            }
+        );
+        return;
+    }
+
+    const palette = [
+        "#6478D3",
+        "#3A9D8F",
+        "#E8AD5A",
+        "#D96C75",
+        "#8B6BC1",
+        "#4D9DC5",
+        "#A3A85A",
+        "#C58B65"
+    ];
+
+    document.querySelectorAll(".submission-card").forEach(
+        function (card) {
+
+            const dataElement = card.querySelector(
+                'script[type="application/json"]'
+            );
+
+            if (!dataElement) {
+                return;
+            }
+
+            const data = JSON.parse(dataElement.textContent);
+
+            const labels = data.labels;
+            const counts = data.counts;
+            const percentages = data.percentages;
+
+            if (!labels.length) {
+                return;
+            }
+
+            const colors = labels.map(function (_, index) {
+                return palette[index % palette.length];
+            });
+
+            const barCanvas = card.querySelector(
+                'canvas[id^="history-bar-chart-"]'
+            );
+
+            const doughnutCanvas = card.querySelector(
+                'canvas[id^="history-doughnut-chart-"]'
+            );
+
+            // Bar chart
+            if (barCanvas) {
+                new Chart(barCanvas, {
+                    type: "bar",
+
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: "Records",
+                            data: counts,
+                            backgroundColor: colors,
+                            borderRadius: 6,
+                            maxBarThickness: 45
+                        }]
+                    },
+
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    precision: 0
+                                },
+                                title: {
+                                    display: true,
+                                    text: "Number of records"
+                                }
+                            }
+                        },
+
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+
+                            tooltip: {
+                                callbacks: {
+                                    label: function (context) {
+                                        const i = context.dataIndex;
+
+                                        return (
+                                            counts[i].toLocaleString() +
+                                            " records (" +
+                                            percentages[i] +
+                                            "%)"
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Doughnut chart
+            if (doughnutCanvas) {
+                new Chart(doughnutCanvas, {
+                    type: "doughnut",
+
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            data: counts,
+                            backgroundColor: colors,
+                            borderWidth: 2,
+                            hoverOffset: 8
+                        }]
+                    },
+
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        cutout: "62%",
+
+                        plugins: {
+                            legend: {
+                                position: "bottom"
+                            },
+
+                            tooltip: {
+                                callbacks: {
+                                    label: function (context) {
+                                        const i = context.dataIndex;
+
+                                        return (
+                                            context.label + ": " +
+                                            counts[i].toLocaleString() +
+                                            " records (" +
+                                            percentages[i] +
+                                            "%)"
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+    );
+});
+</script>
+
+{% endblock %}

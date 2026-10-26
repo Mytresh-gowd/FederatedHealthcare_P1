@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block title %}Federated round{% endblock %}
+{% block content %}
+<div class="page-head">
+    <div><div class="eyebrow">HOSPITAL / FEDERATED LEARNING</div><h1>Submit model update</h1><p class="muted">Your hospital contributes a local tree ensemble; the admin aggregates one contribution per hospital.</p></div>
+    {% if round %}<div class="model-chip"><span>ROUND {{ round.round_no }}</span><b>{{ submitted_clients }}/{{ expected_clients }}</b><small>hospital updates received</small></div>{% endif %}
+</div>
+
+{% if round %}
+<div class="round-progress"><div><b>{{ submitted_clients }} of {{ expected_clients }}</b><span>hospital contributions submitted</span></div><div class="progress"><i style="width:{% widthratio submitted_clients expected_clients 100 %}%"></i></div></div>
+{% endif %}
+
+<section class="card">
+    <div class="card-head"><div><h2>Your local model history</h2><p class="muted">Only the approved model update is submitted to the simulated FL server.</p></div><a class="btn small" href="{% url 'hospital_upload' %}">Train / replace</a></div>
+    <div class="table-wrap"><table><tr><th>File</th><th>Round</th><th>Records</th><th>Accuracy</th><th>Trees</th><th>Status</th><th></th></tr>
+    {% for s in items %}<tr><td>{{ s.filename }}</td><td>#{{ s.round_no }}</td><td>{{ s.records }}</td><td>{{ s.accuracy|floatformat:3 }}</td><td>{{ s.trees }}</td><td><span class="badge">{{ s.status }}</span></td><td>{% if s.status == 'TRAINED' and round and s.round_no == round.round_no %}<form method="post">{% csrf_token %}<button class="btn small primary" type="submit">Submit update</button></form>{% elif s.status == 'SUBMITTED' %}<span class="muted">Waiting for aggregation</span>{% elif s.status == 'AGGREGATED' %}<span class="muted">Included in global model</span>{% endif %}</td></tr>{% empty %}<tr><td colspan="7" class="muted">Train a local model first.</td></tr>{% endfor %}</table></div>
+</section>
+
+<div class="notice"><b>Federated-learning note:</b> this academic prototype aggregates Random Forest tree estimators. It does not send raw hospital training rows into the aggregation function, but it is not cryptographic secure aggregation.</div>
+{% endblock %}
