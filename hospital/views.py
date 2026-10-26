@@ -375,6 +375,7 @@ def upload(request):
                 sub.trees = result['trees']
                 sub.status = 'TRAINED'
                 sub.artifact_path = result['path']
+                sub.analytics_data = analytics or {}
                 sub.save()
 
                 metric = sub
@@ -529,6 +530,8 @@ def history(request):
 
         history_charts.append({
             'item': item,
+            'analytics': item.analytics_data or {},
+            'analytics_data_id': f'history-analytics-data-{item.id}',
             'class_count': len(labels),
             'class_rows': class_rows,
             'chart_data': chart_data,

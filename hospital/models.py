@@ -6,45 +6,31 @@ class Submission(models.Model):
     STATUS=[('TRAINED','Local model trained'),('SUBMITTED','Submitted to FL round'),('AGGREGATED','Included in global model')]
 
     hospital=models.ForeignKey(User,on_delete=models.CASCADE,related_name='submissions')
-
     filename=models.CharField(max_length=255)
-
     records=models.PositiveIntegerField(default=0)
-
     train_rows=models.PositiveIntegerField(default=0)
-
     validation_rows=models.PositiveIntegerField(default=0)
-
     test_rows=models.PositiveIntegerField(default=0)
-
     class_distribution=models.JSONField(default=dict,blank=True)
-
+    analytics_data=models.JSONField(default=dict,blank=True)
     accuracy=models.FloatField(null=True,blank=True)
-
     macro_f1=models.FloatField(null=True,blank=True)
-
     trees=models.PositiveIntegerField(default=0)
-
     status=models.CharField(
         max_length=30,
         choices=STATUS,
         default='TRAINED'
     )
-
     round_no=models.PositiveIntegerField(default=1)
-
     model_version=models.CharField(
         max_length=50,
         default='v1.0.0'
     )
-
     artifact_path=models.CharField(
         max_length=500,
         blank=True
     )
-
     created_at=models.DateTimeField(auto_now_add=True)
-
     submitted_at=models.DateTimeField(null=True,blank=True)
 
     class Meta:
