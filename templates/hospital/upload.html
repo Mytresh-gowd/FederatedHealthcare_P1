@@ -109,6 +109,123 @@
         </div>
     </div>
 
+
+    <!-- Extended dataset analytics -->
+    {% if analytics %}
+    <div class="analytics-section">
+        <div class="section-heading">
+            <span class="eyebrow">DATASET INSIGHTS</span>
+            <h2>Patient Population &amp; Health Analytics</h2>
+            <p class="muted">Descriptive statistics calculated from the uploaded CSV. These summaries do not diagnose patients or establish causation.</p>
+        </div>
+
+        <div class="summary-grid analytics-summary-grid">
+            <div class="summary-item"><span>Raw CSV records</span><b>{{ analytics.total_rows }}</b></div>
+            <div class="summary-item"><span>Rows complete across present features</span><b>{{ analytics.complete_rows }}</b></div>
+            <div class="summary-item"><span>Missing/blank feature cells</span><b>{{ analytics.missing_feature_cells }}</b></div>
+            <div class="summary-item"><span>Duplicate rows</span><b>{{ analytics.duplicate_rows }}</b></div>
+        </div>
+
+        {% if analytics.missing_columns %}
+        <div class="alert error analytics-alert">
+            <strong>Missing required columns:</strong> {{ analytics.missing_columns|join:", " }}.
+            The training service also validates required model columns.
+        </div>
+        {% endif %}
+
+        {% if analytics.negative_values %}
+        <div class="alert error analytics-alert">
+            <strong>Negative numeric values detected:</strong>
+            {% for column, count in analytics.negative_values.items %}
+                {{ column }} ({{ count }}){% if not forloop.last %}, {% endif %}
+            {% endfor %}.
+            Review these values; this descriptive report does not automatically correct them.
+        </div>
+        {% endif %}
+
+        <div class="analytics-grid">
+            <div class="history-chart-panel">
+                <h3>Age Group Distribution</h3><p class="muted">Counts grouped into broad age bands.</p>
+                <div class="analytics-canvas"><canvas id="ageGroupsChart"></canvas></div>
+            </div>
+            <div class="history-chart-panel">
+                <h3>Age Groups by Gender</h3><p class="muted">Compare gender categories within each age group.</p>
+                <div class="analytics-canvas"><canvas id="ageGenderChart"></canvas></div>
+            </div>
+            <div class="history-chart-panel">
+                <h3>Smoking Status</h3><p class="muted">Reported smoking categories, including missing values.</p>
+                <div class="analytics-canvas"><canvas id="smokingChart"></canvas></div>
+            </div>
+            <div class="history-chart-panel">
+                <h3>Employment Status</h3><p class="muted">Employment categories found in the CSV.</p>
+                <div class="analytics-canvas"><canvas id="employmentChart"></canvas></div>
+            </div>
+            <div class="history-chart-panel">
+                <h3>Physical Activity</h3><p class="muted">Distribution of recorded activity categories.</p>
+                <div class="analytics-canvas"><canvas id="activityChart"></canvas></div>
+            </div>
+            <div class="history-chart-panel">
+                <h3>Education Level</h3><p class="muted">Education categories found in the CSV.</p>
+                <div class="analytics-canvas"><canvas id="educationChart"></canvas></div>
+            </div>
+            <div class="history-chart-panel">
+                <h3>BMI Categories</h3><p class="muted">Adult BMI groupings used descriptively; not a diagnosis.</p>
+                <div class="analytics-canvas"><canvas id="bmiCategoriesChart"></canvas></div>
+            </div>
+            <div class="history-chart-panel">
+                <h3>Sleep Hours</h3><p class="muted">Grouped as under 6, 6–8, over 8 hours, and missing/invalid.</p>
+                <div class="analytics-canvas"><canvas id="sleepChart"></canvas></div>
+            </div>
+            <div class="history-chart-panel">
+                <h3>Cholesterol Distribution</h3><p class="muted">Data-driven value bins based on the uploaded values; units should be confirmed.</p>
+                <div class="analytics-canvas"><canvas id="cholesterolChart"></canvas></div>
+            </div>
+            <div class="history-chart-panel">
+                <h3>Glucose Distribution</h3><p class="muted">Data-driven value bins.</p>
+                <div class="analytics-canvas"><canvas id="glucoseChart"></canvas></div>
+            </div>
+            <div class="history-chart-panel">
+                <h3>HbA1c Distribution</h3><p class="muted">Data-driven value bins.</p>
+                <div class="analytics-canvas"><canvas id="hba1cChart"></canvas></div>
+            </div>
+            <div class="history-chart-panel">
+                <h3>Blood Pressure Distribution</h3><p class="muted">Data-driven bins for the blood_pressure feature.</p>
+                <div class="analytics-canvas"><canvas id="bloodPressureChart"></canvas></div>
+            </div>
+            <div class="history-chart-panel">
+                <h3>Sublabel Distribution</h3><p class="muted">Actual target class counts in the uploaded data.</p>
+                <div class="analytics-canvas"><canvas id="analyticsSublabelChart"></canvas></div>
+            </div>
+            <div class="history-chart-panel">
+                <h3>Smoking by Gender</h3><p class="muted">Descriptive cross-tabulation; does not imply causation.</p>
+                <div class="analytics-canvas"><canvas id="smokingGenderChart"></canvas></div>
+            </div>
+            <div class="history-chart-panel">
+                <h3>BMI Categories by Age Group</h3><p class="muted">Counts by age group and BMI category.</p>
+                <div class="analytics-canvas"><canvas id="bmiAgeChart"></canvas></div>
+            </div>
+        </div>
+
+        <div class="class-summary">
+            <h3>Numeric Feature Summary</h3>
+            <p class="muted">Count, mean, median, minimum and maximum of selected numeric fields.</p>
+            <div class="table-wrap">
+                <table class="class-table">
+                    <thead><tr><th>Feature</th><th>Valid values</th><th>Mean</th><th>Median</th><th>Minimum</th><th>Maximum</th></tr></thead>
+                    <tbody>
+                    {% for name, stats in analytics.numeric_summaries.items %}
+                        <tr><td>{{ name }}</td><td>{{ stats.count }}</td><td>{{ stats.mean|default:"—" }}</td><td>{{ stats.median|default:"—" }}</td><td>{{ stats.min|default:"—" }}</td><td>{{ stats.max|default:"—" }}</td></tr>
+                    {% empty %}
+                        <tr><td colspan="6">No numeric summary data available.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {{ analytics|json_script:"dataset-analytics-data" }}
+    {% endif %}
+
     <!-- Detailed class table -->
     <div class="class-summary">
         <h3>Sublabel Details</h3>
@@ -295,8 +412,41 @@
     margin: 0;
 }
 
+
+.analytics-section {
+    margin-top: 36px;
+    padding-top: 28px;
+    border-top: 1px solid var(--border-color, #e5e7eb);
+}
+.analytics-summary-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.analytics-alert { margin: 16px 0; }
+.analytics-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+    margin-top: 22px;
+}
+.analytics-grid .history-chart-panel {
+    min-width: 0;
+    padding: 18px;
+    border: 1px solid var(--border-color, #e5e7eb);
+    border-radius: 14px;
+}
+.analytics-grid h3 { margin: 0 0 6px; }
+.analytics-grid p { font-size: 13px; margin-bottom: 16px; }
+.analytics-canvas { position: relative; height: 280px; min-width: 0; }
+
+@media (max-width: 900px) {
+    .analytics-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 @media (max-width: 650px) {
     .summary-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .analytics-grid {
         grid-template-columns: 1fr;
     }
 
@@ -512,6 +662,79 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
 });
+
+    // Extended dataset analytics charts.
+    const analyticsElement = document.getElementById("dataset-analytics-data");
+    if (analyticsElement && typeof Chart !== "undefined") {
+        const a = JSON.parse(analyticsElement.textContent);
+        const analyticsColors = ["#6478D3", "#3A9D8F", "#E8AD5A", "#D96C75", "#8B6BC1", "#4D9DC5", "#A3A85A", "#C58B65", "#9B9B9B"];
+
+        function simpleChart(id, dataset, type) {
+            const canvas = document.getElementById(id);
+            if (!canvas || !dataset || !dataset.labels || !dataset.labels.length) {
+                if (canvas) canvas.parentElement.innerHTML = '<p class="muted">No data available for this feature.</p>';
+                return;
+            }
+            new Chart(canvas, {
+                type: type || "bar",
+                data: {
+                    labels: dataset.labels,
+                    datasets: [{
+                        label: "Records",
+                        data: dataset.counts,
+                        backgroundColor: dataset.labels.map((_, i) => analyticsColors[i % analyticsColors.length]),
+                        borderRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: type === "doughnut", position: "bottom" } },
+                    scales: type === "doughnut" ? {} : { y: { beginAtZero: true, ticks: { precision: 0 } } }
+                }
+            });
+        }
+
+        function groupedChart(id, dataset, stacked) {
+            const canvas = document.getElementById(id);
+            if (!canvas || !dataset || !dataset.labels || !dataset.labels.length || !dataset.datasets || !dataset.datasets.length) {
+                if (canvas) canvas.parentElement.innerHTML = '<p class="muted">Required columns or usable data are unavailable.</p>';
+                return;
+            }
+            new Chart(canvas, {
+                type: "bar",
+                data: {
+                    labels: dataset.labels,
+                    datasets: dataset.datasets.map((d, i) => ({
+                        label: d.label, data: d.data,
+                        backgroundColor: analyticsColors[i % analyticsColors.length],
+                        borderRadius: 4
+                    }))
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: { x: { stacked: !!stacked }, y: { stacked: !!stacked, beginAtZero: true, ticks: { precision: 0 } } },
+                    plugins: { legend: { position: "bottom" } }
+                }
+            });
+        }
+
+        simpleChart("ageGroupsChart", a.age_groups);
+        groupedChart("ageGenderChart", a.age_gender, false);
+        simpleChart("smokingChart", a.smoking, "doughnut");
+        simpleChart("employmentChart", a.employment);
+        simpleChart("activityChart", a.physical_activity);
+        simpleChart("educationChart", a.education);
+        simpleChart("bmiCategoriesChart", a.bmi_categories, "doughnut");
+        simpleChart("sleepChart", a.sleep_groups);
+        simpleChart("cholesterolChart", a.cholesterol);
+        simpleChart("glucoseChart", a.glucose);
+        simpleChart("hba1cChart", a.hba1c);
+        simpleChart("bloodPressureChart", a.blood_pressure);
+        simpleChart("analyticsSublabelChart", a.sublabel);
+        groupedChart("smokingGenderChart", a.smoking_by_gender, false);
+        groupedChart("bmiAgeChart", a.bmi_by_age, true);
+    }
+
 </script>
 
 {% endif %}
