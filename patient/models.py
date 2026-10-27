@@ -8,5 +8,6 @@ class Prediction(models.Model):
     probabilities=models.JSONField(default=dict,blank=True)
     input_snapshot=models.JSONField(default=dict,blank=True)
     model_version=models.CharField(max_length=50,default='v1.0.0')
+    model_name=models.CharField(max_length=120,blank=True,default='')
     created_at=models.DateTimeField(auto_now_add=True)
     class Meta: ordering=['-created_at']

@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+{% block title %}Hospital Patient Prediction{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <span class="eyebrow">HOSPITAL PORTAL / PATIENT PREDICTION</span>
+    <h1>Individual Patient Prediction</h1>
+    <p class="muted">Predict using manually entered measurements or find a patient in a CSV by patient ID.</p>
+  </div>
+</div>
+
+{% if error %}<div class="alert error">{{ error }}</div>{% endif %}
+
+{% if result %}
+<section class="hero-result success">
+  <div>
+    <span class="eyebrow">PREDICTION RESULT{% if result.patient_id %} · PATIENT {{ result.patient_id }}{% endif %}</span>
+    <h2>{{ result.label }}</h2>
+    <p>Confidence: <strong>{{ result.confidence_percent }}%</strong>.</p>
+    <p class="muted">Model: {{ result.model_name }} · Version {{ result.version }}</p>
+    <p class="muted">This is a model prediction, not a clinical diagnosis. A qualified healthcare professional should interpret the result.</p>
+  </div>
+</section>
+<section class="card">
+  <div class="card-head"><div><span class="eyebrow">CLASS PROBABILITIES</span><h2>Prediction breakdown</h2></div></div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Class</th><th>Probability</th></tr></thead>
+    <tbody>{% for p in result.probs %}<tr><td>{{ p.label }}</td><td>{{ p.value|floatformat:4 }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+</section>
+{% endif %}
+
+<div class="card">
+  <div class="card-head">
+    <div><span class="eyebrow">OPTION 1</span><h2>Manual patient entry</h2></div>
+  </div>
+  <p class="muted">Enter the patient's information and measurements. BMI and derived features are calculated by the existing patient validation logic.</p>
+  <form method="post" class="form-card" novalidate>
+    {% csrf_token %}
+    <input type="hidden" name="mode" value="manual_predict">
+    <div class="form-grid">
+      {% for f in manual_fields %}
+      <label>{{ f.label }}
+        {% if f.type == 'select' %}
+          <select name="{{ f.key }}" required>
+            <option value="">Select</option>
+            {% for option in f.options %}
+              <option value="{{ option }}" {% if f.value == option %}selected{% endif %}>{{ option }}</option>
+            {% endfor %}
+          </select>
+        {% else %}
+          <input type="number" name="{{ f.key }}" step="any" required value="{{ f.value }}">
+        {% endif %}
+      </label>
+      {% endfor %}
+    </div>
+    <div class="form-actions"><button class="btn primary" type="submit">Predict patient</button></div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <div><span class="eyebrow">OPTION 2</span><h2>CSV patient-ID lookup</h2></div>
+  </div>
+  <p class="muted">Upload a CSV containing the model feature columns and a unique ID column. Supported identifier headers include <code>patient_id</code>, <code>patientid</code>, <code>id</code>, and <code>composite_key</code>.</p>
+  <form method="post" enctype="multipart/form-data" class="form-card">
+    {% csrf_token %}
+    <input type="hidden" name="mode" value="csv_lookup">
+    <div class="form-grid">
+      <label>Patient CSV file<input type="file" name="patient_csv" accept=".csv" required></label>
+      <label>Patient ID<input type="text" name="patient_id" value="{{ lookup_patient_id }}" required placeholder="Enter patient ID"></label>
+    </div>
+    <div class="form-actions"><button class="btn primary" type="submit">Find patient</button></div>
+  </form>
+
+  {% if csv_fields and csv_payload %}
+  <div class="form-section">
+    <span class="eyebrow">MATCHED PATIENT</span>
+    <h2>Patient ID: {{ matched_patient_id }}</h2>
+    <p class="muted">Verify the feature values below before running prediction.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Model feature</th><th>Value from CSV</th></tr></thead>
+      <tbody>{% for f in csv_fields %}<tr><td>{{ f.label }}</td><td>{{ f.value }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+    <form method="post" class="form-actions">
+      {% csrf_token %}
+      <input type="hidden" name="mode" value="csv_predict">
+      <input type="hidden" name="matched_patient_id" value="{{ matched_patient_id }}">
+      <input type="hidden" name="csv_payload" value="{{ csv_payload }}">
+      <button class="btn primary" type="submit">Predict this patient</button>
+    </form>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -47,7 +47,7 @@ def predict(request):
  result=None; error=None
  if request.method=='POST':
   try:
-   payload=_build_model_payload(request.POST); label,confidence,probs=predict_one(payload); info=model_info(); Prediction.objects.create(patient=request.user,prediction=LABELS.get(label,label),confidence=confidence,probabilities=probs,input_snapshot=payload,model_version=info['version']); result={'label':LABELS.get(label,label),'confidence':confidence,'probs':{LABELS.get(k,k):v for k,v in probs.items()},'version':info['version']}
+   payload=_build_model_payload(request.POST); label,confidence,probs=predict_one(payload); info=model_info(); Prediction.objects.create(patient=request.user,prediction=LABELS.get(label,label),confidence=confidence,probabilities=probs,input_snapshot=payload,model_version=info['version'],model_name=info.get('model_name') or info.get('model_type') or 'Global model'); result={'label':LABELS.get(label,label),'confidence':confidence,'probs':{LABELS.get(k,k):v for k,v in probs.items()},'version':info['version'],'model_name':info.get('model_name') or info.get('model_type') or 'Global model','model_type':info.get('model_type') or 'Global model'}
   except Exception as exc: error=str(exc)
  fields=[(k,v[0],v[1],v[2],OPTIONS.get(k,[])) for k,v in PATIENT_FIELDS.items()]
  return render(request,'patient/predict.html',{'result':result,'error':error,'fields':fields,'model':model_info()})

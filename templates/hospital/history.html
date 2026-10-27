@@ -4,328 +4,567 @@
 {% block title %}Submission History{% endblock %}
 
 {% block content %}
+
 <div class="page-head">
     <div>
         <span class="eyebrow">HOSPITAL PORTAL</span>
         <h1>Submission history</h1>
         <p class="muted">
-            Review previous local training submissions, disease-class distributions,
-            and saved dataset analytics.
+            Review your previous local training submissions and
+            explore each dataset's disease-class distribution.
         </p>
     </div>
 </div>
 
+<section class="global-card"><div><span class="eyebrow">CURRENT ACTIVE MODEL</span><h2>{{ model.model_name|default:model.version }}</h2><p>{{ model.model_type|default:"Global model" }} · Version {{ model.version }}</p></div><div><span class="stat-label">Trees</span><strong>{{ model.trees }}</strong></div></section>
+
 {% if history_charts %}
+
 <div class="history-list">
+
     {% for chart in history_charts %}
     {% with s=chart.item %}
-    <section class="card submission-card" data-submission-id="{{ s.id }}">
+
+    <section class="card submission-card">
+
+        <!-- Submission information -->
         <div class="submission-header">
             <div class="submission-title">
-                <span class="eyebrow">ROUND #{{ s.round_no }}</span>
+                <span class="eyebrow">
+                    ROUND #{{ s.round_no }}
+                </span>
+
                 <h2>{{ s.filename }}</h2>
-                <p class="muted">{{ s.submitted_at|default:s.created_at|date:'d M Y, H:i' }}</p>
+
+                <p class="muted">
+                    {{ s.submitted_at|default:s.created_at|date:'d M Y, H:i' }}
+                </p>
             </div>
+
             <span class="badge">{{ s.status }}</span>
         </div>
 
+        
+        <!-- Summary cards -->
         <div class="history-stats">
+
             <div class="history-stat">
                 <span>Total records</span>
                 <strong>{{ s.records }}</strong>
             </div>
+
             <div class="history-stat">
                 <span>Unique sublabels</span>
                 <strong>{{ chart.class_count }}</strong>
             </div>
+
         </div>
 
-        {% if chart.class_rows %}
-        <div class="history-charts">
-            <div class="history-chart-panel">
-                <h3>Disease Class Distribution</h3>
-                <p class="muted">Records per sublabel. Hover over a bar for counts and percentages.</p>
-                <div class="history-bar-wrap"><canvas id="{{ chart.bar_chart_id }}"></canvas></div>
-            </div>
-            <div class="history-chart-panel">
-                <h3>Class Composition</h3>
-                <p class="muted">Percentage share of each class.</p>
-                <div class="history-doughnut-wrap"><canvas id="{{ chart.doughnut_chart_id }}"></canvas></div>
-            </div>
-        </div>
-
-        <details class="distribution-details">
-            <summary>View sublabel counts and percentages</summary>
-            <div class="table-wrap">
-                <table>
-                    <thead><tr><th>Sublabel</th><th>Records</th><th>Percentage</th></tr></thead>
-                    <tbody>
-                    {% for row in chart.class_rows %}
-                        <tr><td>{{ row.label }}</td><td>{{ row.count }}</td><td>{{ row.percentage }}%</td></tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </details>
-        {% else %}
-            <p class="muted">Disease-class distribution is unavailable for this submission.</p>
-        {% endif %}
-
-        {% with a=chart.analytics %}
-        {% if a %}
-        <section class="analytics-section">
-            <div class="section-heading">
-                <span class="eyebrow">SAVED DATASET INSIGHTS</span>
-                <h2>Patient Population &amp; Health Analytics</h2>
-                <p class="muted">Descriptive summaries from the CSV uploaded for this submission. These charts do not diagnose patients or establish causation.</p>
+        <!-- Persisted dataset analytics from the original CSV upload -->
+        {% if chart.analytics %}
+        <section class="dataset-analytics">
+            <div class="analytics-heading">
+                <div>
+                    <h3>Dataset Analytics</h3>
+                    <p class="muted">Descriptive statistics calculated from the uploaded dataset.</p>
+                </div>
+                <span class="muted">{{ chart.analytics.total_rows|default:s.records }} records analysed</span>
             </div>
 
             <div class="analytics-summary-grid">
-                <div class="analytics-stat"><span>Raw CSV records</span><strong>{{ a.total_rows|default:"—" }}</strong></div>
-                <div class="analytics-stat"><span>Complete rows across available features</span><strong>{{ a.complete_rows|default:"—" }}</strong></div>
-                <div class="analytics-stat"><span>Missing/blank feature cells</span><strong>{{ a.missing_feature_cells|default:"—" }}</strong></div>
-                <div class="analytics-stat"><span>Duplicate rows</span><strong>{{ a.duplicate_rows|default:"—" }}</strong></div>
+                <div class="analytics-summary">
+                    <span>Total rows</span>
+                    <strong>{{ chart.analytics.total_rows|default:"—" }}</strong>
+                </div>
+                <div class="analytics-summary">
+                    <span>Complete rows</span>
+                    <strong>{{ chart.analytics.complete_rows|default:"—" }}</strong>
+                </div>
+                <div class="analytics-summary">
+                    <span>Missing feature cells</span>
+                    <strong>{{ chart.analytics.missing_feature_cells|default:"0" }}</strong>
+                </div>
+                <div class="analytics-summary">
+                    <span>Duplicate rows</span>
+                    <strong>{{ chart.analytics.duplicate_rows|default:"0" }}</strong>
+                </div>
             </div>
-
-            {% if a.missing_columns %}
-            <div class="analytics-notice warning">
-                <strong>Missing required columns:</strong> {{ a.missing_columns|join:", " }}
-            </div>
-            {% endif %}
-            {% if a.negative_values %}
-            <div class="analytics-notice warning">
-                <strong>Negative numeric values detected:</strong>
-                {% for column, count in a.negative_values.items %}{{ column }} ({{ count }}){% if not forloop.last %}, {% endif %}{% endfor %}
-            </div>
-            {% endif %}
 
             <div class="analytics-grid">
-                <div class="history-chart-panel"><h3>Age Group Distribution</h3><p class="muted">Counts across broad age bands.</p><div class="analytics-canvas"><canvas id="age-groups-{{ s.id }}"></canvas></div></div>
-                <div class="history-chart-panel"><h3>Age Groups by Gender</h3><p class="muted">Gender distribution within each age group.</p><div class="analytics-canvas"><canvas id="age-gender-{{ s.id }}"></canvas></div></div>
-                <div class="history-chart-panel"><h3>Gender Distribution</h3><p class="muted">Recorded gender categories.</p><div class="analytics-canvas"><canvas id="gender-{{ s.id }}"></canvas></div></div>
-                <div class="history-chart-panel"><h3>Smoking Status</h3><p class="muted">Recorded smoking categories, including missing values.</p><div class="analytics-canvas"><canvas id="smoking-{{ s.id }}"></canvas></div></div>
-                <div class="history-chart-panel"><h3>Employment Status</h3><p class="muted">Employment categories present in the CSV.</p><div class="analytics-canvas"><canvas id="employment-{{ s.id }}"></canvas></div></div>
-                <div class="history-chart-panel"><h3>Physical Activity</h3><p class="muted">Recorded physical activity values.</p><div class="analytics-canvas"><canvas id="activity-{{ s.id }}"></canvas></div></div>
-                <div class="history-chart-panel"><h3>Education Level</h3><p class="muted">Recorded education categories.</p><div class="analytics-canvas"><canvas id="education-{{ s.id }}"></canvas></div></div>
-                <div class="history-chart-panel"><h3>Family History</h3><p class="muted">Recorded family-history categories.</p><div class="analytics-canvas"><canvas id="family-history-{{ s.id }}"></canvas></div></div>
-                <div class="history-chart-panel"><h3>Stress Level</h3><p class="muted">Recorded stress-level categories.</p><div class="analytics-canvas"><canvas id="stress-{{ s.id }}"></canvas></div></div>
-                <div class="history-chart-panel"><h3>BMI Categories</h3><p class="muted">Descriptive adult BMI groupings, not a diagnosis.</p><div class="analytics-canvas"><canvas id="bmi-categories-{{ s.id }}"></canvas></div></div>
-                <div class="history-chart-panel"><h3>BMI Level</h3><p class="muted">Recorded BMI-level categories.</p><div class="analytics-canvas"><canvas id="bmi-level-{{ s.id }}"></canvas></div></div>
-                <div class="history-chart-panel"><h3>Sleep Hours</h3><p class="muted">Grouped sleep-hour distribution.</p><div class="analytics-canvas"><canvas id="sleep-{{ s.id }}"></canvas></div></div>
-                <div class="history-chart-panel"><h3>Cholesterol Distribution</h3><p class="muted">Value bins calculated from this upload.</p><div class="analytics-canvas"><canvas id="cholesterol-{{ s.id }}"></canvas></div></div>
-                <div class="history-chart-panel"><h3>Glucose Distribution</h3><p class="muted">Value bins calculated from this upload.</p><div class="analytics-canvas"><canvas id="glucose-{{ s.id }}"></canvas></div></div>
-                <div class="history-chart-panel"><h3>HbA1c Distribution</h3><p class="muted">Value bins calculated from this upload.</p><div class="analytics-canvas"><canvas id="hba1c-{{ s.id }}"></canvas></div></div>
-                <div class="history-chart-panel"><h3>Blood Pressure Distribution</h3><p class="muted">Distribution of the blood_pressure feature.</p><div class="analytics-canvas"><canvas id="blood-pressure-{{ s.id }}"></canvas></div></div>
-                <div class="history-chart-panel"><h3>Systolic Blood Pressure</h3><p class="muted">Distribution of systolic blood pressure values.</p><div class="analytics-canvas"><canvas id="systolic-bp-{{ s.id }}"></canvas></div></div>
-                <div class="history-chart-panel"><h3>Diastolic Blood Pressure</h3><p class="muted">Distribution of diastolic blood pressure values.</p><div class="analytics-canvas"><canvas id="diastolic-bp-{{ s.id }}"></canvas></div></div>
-                <div class="history-chart-panel"><h3>Smoking by Gender</h3><p class="muted">Descriptive cross-tabulation, not evidence of causation.</p><div class="analytics-canvas"><canvas id="smoking-gender-{{ s.id }}"></canvas></div></div>
-                <div class="history-chart-panel"><h3>BMI Categories by Age Group</h3><p class="muted">BMI category counts across age bands.</p><div class="analytics-canvas"><canvas id="bmi-age-{{ s.id }}"></canvas></div></div>
+                <div class="history-chart-panel">
+                    <h3>Age-group Distribution</h3>
+                    <div class="analytics-chart-wrap"><canvas data-analytics-chart="age_groups"></canvas></div>
+                </div>
+                <div class="history-chart-panel">
+                    <h3>Gender Distribution</h3>
+                    <div class="analytics-chart-wrap"><canvas data-analytics-chart="gender"></canvas></div>
+                </div>
+                <div class="history-chart-panel">
+                    <h3>BMI Categories</h3>
+                    <div class="analytics-chart-wrap"><canvas data-analytics-chart="bmi_categories"></canvas></div>
+                </div>
+                <div class="history-chart-panel">
+                    <h3>Physical Activity</h3>
+                    <div class="analytics-chart-wrap"><canvas data-analytics-chart="physical_activity"></canvas></div>
+                </div>
+                <div class="history-chart-panel">
+                    <h3>Smoking Status</h3>
+                    <div class="analytics-chart-wrap"><canvas data-analytics-chart="smoking"></canvas></div>
+                </div>
+                <div class="history-chart-panel">
+                    <h3>Sleep Hours</h3>
+                    <div class="analytics-chart-wrap"><canvas data-analytics-chart="sleep_groups"></canvas></div>
+                </div>
+                <div class="history-chart-panel">
+                    <h3>Cholesterol Distribution</h3>
+                    <div class="analytics-chart-wrap"><canvas data-analytics-chart="cholesterol"></canvas></div>
+                </div>
+                <div class="history-chart-panel">
+                    <h3>Glucose Distribution</h3>
+                    <div class="analytics-chart-wrap"><canvas data-analytics-chart="glucose"></canvas></div>
+                </div>
+                <div class="history-chart-panel">
+                    <h3>HbA1c Distribution</h3>
+                    <div class="analytics-chart-wrap"><canvas data-analytics-chart="hba1c"></canvas></div>
+                </div>
+                <div class="history-chart-panel">
+                    <h3>Smoking by Gender</h3>
+                    <div class="analytics-chart-wrap"><canvas data-analytics-chart="smoking_by_gender"></canvas></div>
+                </div>
+                <div class="history-chart-panel">
+                    <h3>BMI by Age Group</h3>
+                    <div class="analytics-chart-wrap"><canvas data-analytics-chart="bmi_by_age"></canvas></div>
+                </div>
             </div>
 
-            <details class="distribution-details numeric-details">
-                <summary>View numeric feature summary</summary>
+            {% if chart.analytics.numeric_summaries %}
+            <details class="distribution-details">
+                <summary>View numerical feature summary</summary>
                 <div class="table-wrap">
                     <table>
-                        <thead><tr><th>Feature</th><th>Valid values</th><th>Mean</th><th>Median</th><th>Minimum</th><th>Maximum</th></tr></thead>
+                        <thead><tr><th>Feature</th><th>Count</th><th>Mean</th><th>Median</th><th>Minimum</th><th>Maximum</th></tr></thead>
                         <tbody>
-                        {% for name, stats in a.numeric_summaries.items %}
-                            <tr><td>{{ name }}</td><td>{{ stats.count }}</td><td>{{ stats.mean|default_if_none:"—" }}</td><td>{{ stats.median|default_if_none:"—" }}</td><td>{{ stats.min|default_if_none:"—" }}</td><td>{{ stats.max|default_if_none:"—" }}</td></tr>
-                        {% empty %}
-                            <tr><td colspan="6">No numeric summary data available.</td></tr>
-                        {% endfor %}
+                            {% for name, summary in chart.analytics.numeric_summaries.items %}
+                            <tr>
+                                <td>{{ name }}</td>
+                                <td>{{ summary.count }}</td>
+                                <td>{{ summary.mean|default_if_none:"—" }}</td>
+                                <td>{{ summary.median|default_if_none:"—" }}</td>
+                                <td>{{ summary.min|default_if_none:"—" }}</td>
+                                <td>{{ summary.max|default_if_none:"—" }}</td>
+                            </tr>
+                            {% endfor %}
                         </tbody>
                     </table>
                 </div>
             </details>
+            {% endif %}
+
+            {{ chart.analytics|json_script:chart.analytics_data_id }}
         </section>
         {% else %}
-        <section class="analytics-section">
-            <h3>Dataset analytics not saved for this submission</h3>
-            <p class="muted">This submission was created before saved analytics were enabled. Upload the dataset again in a new submission to store the expanded charts in history.</p>
+        <section class="dataset-analytics">
+            <h3>Dataset Analytics</h3>
+            <p class="muted">Analytics were not saved for this submission. This may apply to older submissions created before analytics persistence was enabled.</p>
         </section>
         {% endif %}
-        {% endwith %}
 
-        <div class="submission-actions">
-            <a class="btn small ghost" href="{% url 'hospital_submission_detail' s.id %}">View more</a>
+        {% if chart.class_rows %}
+
+        <!-- Charts -->
+        <div class="history-charts">
+
+            <div class="history-chart-panel">
+                <h3>Disease Class Distribution</h3>
+
+                <p class="muted">
+                    Compare the number of records in each sublabel.
+                    Hover over a bar to view its count and percentage.
+                </p>
+
+                <div class="history-bar-wrap">
+                    <canvas id="{{ chart.bar_chart_id }}"></canvas>
+                </div>
+            </div>
+
+            <div class="history-chart-panel">
+                <h3>Class Composition</h3>
+
+                <p class="muted">
+                    Percentage share of each class.
+                </p>
+
+                <div class="history-doughnut-wrap">
+                    <canvas id="{{ chart.doughnut_chart_id }}"></canvas>
+                </div>
+            </div>
+
         </div>
 
+        <!-- Sublabel details -->
+        <details class="distribution-details">
+            <summary>View sublabel counts and percentages</summary>
+
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Sublabel</th>
+                            <th>Records</th>
+                            <th>Percentage</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {% for row in chart.class_rows %}
+                        <tr>
+                            <td>{{ row.label }}</td>
+                            <td>{{ row.count }}</td>
+                            <td>{{ row.percentage }}%</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </details>
+
+        {% else %}
+
+        <p class="muted">
+            Class distribution is unavailable for this submission.
+        </p>
+
+        {% endif %}
+
+        <!-- Existing detail-page link -->
+        <div class="submission-actions">
+            <a class="btn small ghost"
+               href="{% url 'hospital_submission_detail' s.id %}">
+                View more
+            </a>
+        </div>
+
+        <!-- Safely embed this submission's chart data -->
         {{ chart.chart_data|json_script:chart.chart_data_id }}
-        {{ chart.analytics|json_script:chart.analytics_data_id }}
+
     </section>
+
     {% endwith %}
     {% endfor %}
+
 </div>
+
 {% else %}
-<section class="card"><p class="empty-cell">No submissions yet.</p></section>
+
+<section class="card">
+    <p class="empty-cell">No submissions yet.</p>
+</section>
+
 {% endif %}
 
+
 <style>
-.history-list { display: grid; gap: 24px; }
-.submission-card { min-width: 0; }
-.submission-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
-.submission-title { min-width: 0; }
-.submission-title h2 { margin: 8px 0; overflow-wrap: anywhere; }
-.history-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 28px; }
-.history-stat, .analytics-stat { padding: 16px; border: 1px solid var(--border-color, #e5e7eb); border-radius: 12px; }
-.history-stat span, .analytics-stat span { display: block; margin-bottom: 8px; color: var(--muted-color, #6b7280); font-size: 13px; }
-.history-stat strong, .analytics-stat strong { font-size: 21px; overflow-wrap: anywhere; }
-.history-charts { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 18px; }
-.history-chart-panel { min-width: 0; padding: 18px; border: 1px solid var(--border-color, #e5e7eb); border-radius: 14px; }
-.history-chart-panel h3 { margin: 0 0 6px; }
-.history-chart-panel p { margin-bottom: 18px; font-size: 13px; }
-.history-bar-wrap, .history-doughnut-wrap { position: relative; height: 280px; }
-.history-doughnut-wrap { max-width: 310px; margin: auto; }
-.distribution-details { margin-top: 22px; padding: 14px; border: 1px solid var(--border-color, #e5e7eb); border-radius: 10px; }
-.distribution-details summary { cursor: pointer; font-weight: 600; }
-.distribution-details .table-wrap { margin-top: 12px; overflow-x: auto; }
-.distribution-details table { width: 100%; border-collapse: collapse; }
-.distribution-details th, .distribution-details td { padding: 11px; text-align: left; border-bottom: 1px solid var(--border-color, #e5e7eb); }
-.analytics-section { margin-top: 30px; padding-top: 26px; border-top: 1px solid var(--border-color, #e5e7eb); }
-.analytics-summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 18px 0; }
-.analytics-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-top: 22px; }
-.analytics-canvas { position: relative; height: 280px; min-width: 0; }
-.analytics-notice { margin: 12px 0; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border-color, #e5e7eb); }
-.analytics-notice.warning { border-color: #d9a441; }
-.numeric-details { margin-top: 20px; }
-.submission-actions { display: flex; justify-content: flex-end; margin-top: 22px; }
-@media (max-width: 900px) { .analytics-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 800px) { .history-charts, .analytics-grid { grid-template-columns: 1fr; } }
-@media (max-width: 480px) { .submission-header { flex-direction: column; } .analytics-summary-grid { grid-template-columns: 1fr; } }
+.history-list {
+    display: grid;
+    gap: 24px;
+}
+
+.submission-card {
+    min-width: 0;
+}
+
+.submission-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 22px;
+}
+
+.submission-title {
+    min-width: 0;
+}
+
+.submission-title h2 {
+    margin: 8px 0;
+    overflow-wrap: anywhere;
+}
+
+.history-stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 28px;
+}
+
+.history-stat {
+    padding: 16px;
+    border: 1px solid var(--border-color, #e5e7eb);
+    border-radius: 12px;
+}
+
+.history-stat span {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--muted-color, #6b7280);
+    font-size: 13px;
+}
+
+.history-stat strong {
+    font-size: 21px;
+    overflow-wrap: anywhere;
+}
+
+.history-charts {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    gap: 18px;
+}
+
+.history-chart-panel {
+    min-width: 0;
+    padding: 18px;
+    border: 1px solid var(--border-color, #e5e7eb);
+    border-radius: 14px;
+}
+
+.history-chart-panel h3 {
+    margin: 0 0 6px;
+}
+
+.history-chart-panel p {
+    margin-bottom: 18px;
+    font-size: 13px;
+}
+
+.history-bar-wrap {
+    position: relative;
+    height: 280px;
+}
+
+.history-doughnut-wrap {
+    position: relative;
+    height: 280px;
+    max-width: 310px;
+    margin: auto;
+}
+
+.distribution-details {
+    margin-top: 22px;
+    padding: 14px;
+    border: 1px solid var(--border-color, #e5e7eb);
+    border-radius: 10px;
+}
+
+.distribution-details summary {
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.distribution-details .table-wrap {
+    margin-top: 12px;
+    overflow-x: auto;
+}
+
+.distribution-details table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.distribution-details th,
+.distribution-details td {
+    padding: 11px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color, #e5e7eb);
+}
+
+.submission-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 22px;
+}
+
+.dataset-analytics {
+    margin: 10px 0 28px;
+    padding: 20px;
+    border: 1px solid var(--border-color, #e5e7eb);
+    border-radius: 14px;
+}
+.analytics-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 18px;
+}
+.analytics-heading h3 { margin: 0 0 6px; }
+.analytics-heading p { margin: 0; }
+.analytics-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+}
+.analytics-summary {
+    padding: 14px;
+    border: 1px solid var(--border-color, #e5e7eb);
+    border-radius: 10px;
+    min-width: 0;
+}
+.analytics-summary span {
+    display: block;
+    color: var(--muted-color, #6b7280);
+    font-size: 12px;
+    margin-bottom: 7px;
+}
+.analytics-summary strong { font-size: 20px; overflow-wrap: anywhere; }
+.analytics-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+}
+.analytics-chart-wrap { position: relative; height: 260px; }
+.analytics-grid .history-chart-panel { margin: 0; }
+@media (max-width: 800px) {
+    .analytics-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .analytics-grid { grid-template-columns: 1fr; }
+    .analytics-heading { flex-direction: column; }
+}
+
+@media (max-width: 800px) {
+    .history-stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .history-charts {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    .submission-header {
+        flex-direction: column;
+    }
+}
 </style>
 
+
+<!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <script>
 document.addEventListener("DOMContentLoaded", function () {
+
     if (typeof Chart === "undefined") {
-        document.querySelectorAll(".history-chart-panel").forEach(function (panel) {
-            panel.insertAdjacentText("beforeend", " Charts could not load. Check your internet connection.");
-        });
+        document.querySelectorAll(".history-chart-panel").forEach(
+            function (panel) {
+                panel.insertAdjacentText(
+                    "beforeend",
+                    " Charts could not load. Check your internet connection."
+                );
+            }
+        );
         return;
     }
 
-    const palette = ["#6478D3", "#3A9D8F", "#E8AD5A", "#D96C75", "#8B6BC1", "#4D9DC5", "#A3A85A", "#C58B65", "#9B9B9B"];
+    const palette = [
+        "#6478D3",
+        "#3A9D8F",
+        "#E8AD5A",
+        "#D96C75",
+        "#8B6BC1",
+        "#4D9DC5",
+        "#A3A85A",
+        "#C58B65"
+    ];
 
-    function makeSingleChart(canvas, dataset, type) {
-        if (!canvas) return;
-        if (!dataset || !dataset.labels || !dataset.labels.length) {
-            canvas.parentElement.innerHTML = '<p class="muted">No usable data available for this chart.</p>';
-            return;
-        }
-        const colors = dataset.labels.map((_, i) => palette[i % palette.length]);
-        new Chart(canvas, {
-            type: type || "bar",
-            data: {
-                labels: dataset.labels,
-                datasets: [{
-                    label: "Records",
-                    data: dataset.counts || [],
-                    backgroundColor: colors,
-                    borderRadius: 5,
-                    maxBarThickness: 48
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: type === "doughnut", position: "bottom" } },
-                scales: type === "doughnut" ? {} : { y: { beginAtZero: true, ticks: { precision: 0 } } }
+    document.querySelectorAll(".submission-card").forEach(
+        function (card) {
+
+            const classDataElement = card.querySelector(
+                'script[id^="history-chart-data-"]'
+            );
+
+            if (classDataElement) {
+                const data = JSON.parse(classDataElement.textContent);
+                const labels = data.labels || [];
+                const counts = data.counts || [];
+                const percentages = data.percentages || [];
+
+                if (labels.length) {
+                    const colors = labels.map(function (_, index) {
+                        return palette[index % palette.length];
+                    });
+
+                    const barCanvas = card.querySelector('canvas[id^="history-bar-chart-"]');
+                    const doughnutCanvas = card.querySelector('canvas[id^="history-doughnut-chart-"]');
+
+                    if (barCanvas) {
+                        new Chart(barCanvas, {
+                            type: "bar",
+                            data: { labels: labels, datasets: [{ label: "Records", data: counts, backgroundColor: colors, borderRadius: 6, maxBarThickness: 45 }] },
+                            options: {
+                                responsive: true, maintainAspectRatio: false,
+                                scales: { y: { beginAtZero: true, ticks: { precision: 0 }, title: { display: true, text: "Number of records" } } },
+                                plugins: { legend: { display: false }, tooltip: { callbacks: { label: function (context) {
+                                    const i = context.dataIndex;
+                                    return counts[i].toLocaleString() + " records (" + percentages[i] + "%)";
+                                } } } }
+                            }
+                        });
+                    }
+
+                    if (doughnutCanvas) {
+                        new Chart(doughnutCanvas, {
+                            type: "doughnut",
+                            data: { labels: labels, datasets: [{ data: counts, backgroundColor: colors, borderWidth: 2, hoverOffset: 8 }] },
+                            options: {
+                                responsive: true, maintainAspectRatio: false, cutout: "62%",
+                                plugins: { legend: { position: "bottom" }, tooltip: { callbacks: { label: function (context) {
+                                    const i = context.dataIndex;
+                                    return context.label + ": " + counts[i].toLocaleString() + " records (" + percentages[i] + "%)";
+                                } } } }
+                            }
+                        });
+                    }
+                }
             }
-        });
-    }
 
-    function makeGroupedChart(canvas, dataset, stacked) {
-        if (!canvas) return;
-        if (!dataset || !dataset.labels || !dataset.labels.length || !dataset.datasets || !dataset.datasets.length) {
-            canvas.parentElement.innerHTML = '<p class="muted">Required columns or usable data are unavailable.</p>';
-            return;
-        }
-        new Chart(canvas, {
-            type: "bar",
-            data: {
-                labels: dataset.labels,
-                datasets: dataset.datasets.map(function (item, index) {
-                    return { label: item.label, data: item.data, backgroundColor: palette[index % palette.length], borderRadius: 4 };
-                })
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: { x: { stacked: !!stacked }, y: { stacked: !!stacked, beginAtZero: true, ticks: { precision: 0 } } },
-                plugins: { legend: { position: "bottom" } }
-            }
-        });
-    }
-
-    document.querySelectorAll(".submission-card").forEach(function (card) {
-        const classDataElement = card.querySelector('script[id^="history-chart-data-"]');
-        if (classDataElement) {
-            const data = JSON.parse(classDataElement.textContent);
-            if (data.labels && data.labels.length) {
-                const colors = data.labels.map((_, i) => palette[i % palette.length]);
-                const barCanvas = card.querySelector('canvas[id^="history-bar-chart-"]');
-                const doughnutCanvas = card.querySelector('canvas[id^="history-doughnut-chart-"]');
-                if (barCanvas) {
-                    new Chart(barCanvas, {
-                        type: "bar",
-                        data: { labels: data.labels, datasets: [{ label: "Records", data: data.counts, backgroundColor: colors, borderRadius: 6, maxBarThickness: 45 }] },
+            const analyticsElement = card.querySelector(
+                'script[id^="history-analytics-data-"]'
+            );
+            if (analyticsElement) {
+                const analytics = JSON.parse(analyticsElement.textContent);
+                card.querySelectorAll("canvas[data-analytics-chart]").forEach(function (canvas) {
+                    const key = canvas.dataset.analyticsChart;
+                    const chartData = analytics[key];
+                    if (!chartData || !chartData.labels || !chartData.labels.length) {
+                        const panel = canvas.closest(".history-chart-panel");
+                        if (panel) panel.style.display = "none";
+                        return;
+                    }
+                    const isMulti = Array.isArray(chartData.datasets);
+                    const isDoughnut = ["gender", "bmi_categories", "smoking", "physical_activity", "sleep_groups"].includes(key);
+                    const datasets = isMulti
+                        ? chartData.datasets.map(function (dataset, index) {
+                            return { label: dataset.label, data: dataset.data, backgroundColor: isDoughnut ? palette[index % palette.length] : palette[index % palette.length], borderRadius: 5 };
+                        })
+                        : [{ label: "Records", data: chartData.counts || [], backgroundColor: chartData.labels.map(function (_, index) { return palette[index % palette.length]; }), borderRadius: 5 }];
+                    new Chart(canvas, {
+                        type: isDoughnut && !isMulti ? "doughnut" : "bar",
+                        data: { labels: chartData.labels, datasets: datasets },
                         options: {
                             responsive: true, maintainAspectRatio: false,
-                            scales: { y: { beginAtZero: true, ticks: { precision: 0 }, title: { display: true, text: "Number of records" } } },
-                            plugins: { legend: { display: false }, tooltip: { callbacks: { label: function (context) {
-                                const i = context.dataIndex;
-                                return data.counts[i].toLocaleString() + " records (" + data.percentages[i] + "%)";
-                            } } } }
+                            scales: (isDoughnut && !isMulti) ? {} : { y: { beginAtZero: true, ticks: { precision: 0 } } },
+                            plugins: { legend: { display: isMulti || (isDoughnut && !isMulti), position: "bottom" } }
                         }
                     });
-                }
-                if (doughnutCanvas) {
-                    new Chart(doughnutCanvas, {
-                        type: "doughnut",
-                        data: { labels: data.labels, datasets: [{ data: data.counts, backgroundColor: colors, borderWidth: 2, hoverOffset: 8 }] },
-                        options: {
-                            responsive: true, maintainAspectRatio: false, cutout: "62%",
-                            plugins: { legend: { position: "bottom" }, tooltip: { callbacks: { label: function (context) {
-                                const i = context.dataIndex;
-                                return context.label + ": " + data.counts[i].toLocaleString() + " records (" + data.percentages[i] + "%)";
-                            } } } }
-                        }
-                    });
-                }
+                });
             }
+
         }
-
-        const analyticsElement = card.querySelector('script[id^="history-analytics-data-"]');
-        if (!analyticsElement) return;
-        const a = JSON.parse(analyticsElement.textContent);
-        if (!a || !Object.keys(a).length) return;
-
-        const id = function (suffix) { return card.querySelector('[id="' + suffix + '-' + card.dataset.submissionId + '"]'); };
-        const submissionId = card.querySelector('canvas[id^="age-groups-"]')?.id.split("-").pop();
-        // Use the numeric submission ID already embedded in each canvas ID.
-        function canvas(name) { return card.querySelector('canvas[id="' + name + '-' + submissionId + '"]'); }
-
-        makeSingleChart(canvas("age-groups"), a.age_groups);
-        makeGroupedChart(canvas("age-gender"), a.age_gender, false);
-        makeSingleChart(canvas("gender"), a.gender, "doughnut");
-        makeSingleChart(canvas("smoking"), a.smoking, "doughnut");
-        makeSingleChart(canvas("employment"), a.employment);
-        makeSingleChart(canvas("activity"), a.physical_activity);
-        makeSingleChart(canvas("education"), a.education);
-        makeSingleChart(canvas("family-history"), a.family_history, "doughnut");
-        makeSingleChart(canvas("stress"), a.stress_level);
-        makeSingleChart(canvas("bmi-categories"), a.bmi_categories, "doughnut");
-        makeSingleChart(canvas("bmi-level"), a.bmi_level, "doughnut");
-        makeSingleChart(canvas("sleep"), a.sleep_groups);
-        makeSingleChart(canvas("cholesterol"), a.cholesterol);
-        makeSingleChart(canvas("glucose"), a.glucose);
-        makeSingleChart(canvas("hba1c"), a.hba1c);
-        makeSingleChart(canvas("blood-pressure"), a.blood_pressure);
-        makeSingleChart(canvas("systolic-bp"), a.systolic_bp);
-        makeSingleChart(canvas("diastolic-bp"), a.diastolic_bp);
-        makeGroupedChart(canvas("smoking-gender"), a.smoking_by_gender, false);
-        makeGroupedChart(canvas("bmi-age"), a.bmi_by_age, true);
-    });
+    );
 });
 </script>
+
 {% endblock %}

@@ -11,7 +11,7 @@ import numpy as np
 
 from .models import Submission, FederatedRound, GlobalModel
 from services.fl_service import train_local_model, LOCAL_TREES, EXPECTED_CLIENTS
-from services.ml_service import model_info
+from services.ml_service import model_info, FEATURES, predict_one, DISPLAY_CLASSES
 
 
 
@@ -289,6 +289,7 @@ def dashboard(request):
             'items': items,
             'last': last,
             'active': active,
+            'model': model_info(),
             'profile': request.user.profile,
             'current_round': current_round,
             'local_trees': LOCAL_TREES,
@@ -546,6 +547,7 @@ def history(request):
         {
             'items': items,
             'history_charts': history_charts,
+            'model': model_info(),
         }
     )
 
@@ -564,3 +566,213 @@ def detail(request, submission_id):
         'hospital/detail.html',
         {'item': item}
     )
+
+# ---------------------------------------------------------------------------
+# Hospital individual prediction
+# Supports manual entry and CSV patient-ID lookup.
+# CSV lookup accepts patient_id / patientid / id / composite_key as identifier.
+# ---------------------------------------------------------------------------
+HOSPITAL_PREDICTION_FIELDS = [
+    ('age', 'Age (years)', 'number'),
+    ('gender', 'Gender', 'select'),
+    ('height_cm', 'Height (cm)', 'number'),
+    ('weight_kg', 'Weight (kg)', 'number'),
+    ('HbA1c_level', 'HbA1c level', 'number'),
+    ('glucose', 'Glucose', 'number'),
+    ('cholesterol', 'Total cholesterol', 'number'),
+    ('sleep_hours', 'Sleep hours', 'number'),
+    ('triglycerides', 'Triglycerides', 'number'),
+    ('crp_level', 'CRP level', 'number'),
+    ('homocysteine_level', 'Homocysteine level', 'number'),
+    ('systolic_bp', 'Systolic blood pressure', 'number'),
+    ('diastolic_bp', 'Diastolic blood pressure', 'number'),
+    ('alcohol_intake', 'Alcohol intake', 'number'),
+    ('salt_intake', 'Salt intake', 'number'),
+    ('heart_rate', 'Heart rate', 'number'),
+    ('hdl', 'HDL cholesterol', 'number'),
+    ('ldl', 'LDL cholesterol', 'number'),
+    ('smoking', 'Smoking', 'select'),
+    ('physical_activity', 'Physical activity', 'select'),
+    ('family_history', 'Family history', 'select'),
+    ('stress_level', 'Stress level', 'select'),
+    ('sugar_consumption', 'Sugar consumption', 'select'),
+    ('education_level', 'Education level', 'select'),
+    ('employment_status', 'Employment status', 'select'),
+]
+
+HOSPITAL_PREDICTION_OPTIONS = {
+    'gender': ['Female', 'Male'],
+    'smoking': ['Never', 'Former', 'Current'],
+    'physical_activity': ['Low', 'Moderate', 'High'],
+    'family_history': ['No', 'Yes'],
+    'stress_level': ['Low', 'Moderate', 'High'],
+    'sugar_consumption': ['Low', 'Moderate', 'High'],
+    'education_level': ['Primary', 'Secondary', 'Tertiary'],
+    'employment_status': ['Student', 'Employed', 'Self-employed', 'Unemployed'],
+}
+
+def _hospital_manual_payload(post):
+    """Build the same model feature payload as the existing patient form."""
+    # Reuse the existing patient validation/derived-feature logic to avoid drift.
+    from patient.views import _build_model_payload
+    return _build_model_payload(post)
+
+def _csv_value_to_float(value, column):
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        raise ValueError(f"CSV value for '{column}' must be numeric.")
+    if not np.isfinite(number):
+        raise ValueError(f"CSV value for '{column}' is missing or invalid.")
+    return number
+
+def _payload_from_csv_row(row):
+    """Build a prediction payload from the model's original input columns."""
+    payload = {}
+    missing = []
+    for column in FEATURES:
+        if column not in row.index or pd.isna(row[column]) or str(row[column]).strip() == '':
+            missing.append(column)
+            continue
+        value = row[column]
+        if column in ('age', 'age_normalized', 'bmi', 'HbA1c_level', 'glucose',
+                      'cholesterol', 'sleep_hours', 'triglycerides', 'blood_pressure',
+                      'crp_level', 'homocysteine_level', 'systolic_bp', 'diastolic_bp',
+                      'alcohol_intake', 'salt_intake', 'heart_rate', 'hdl', 'ldl'):
+            payload[column] = _csv_value_to_float(value, column)
+        else:
+            payload[column] = str(value).strip()
+    if missing:
+        raise ValueError("The selected CSV row is missing required model fields: " + ", ".join(missing))
+    return payload
+
+def _normalise_csv_columns(df):
+    """Trim headers and find a usable patient identifier column."""
+    df = df.copy()
+    df.columns = [str(column).strip() for column in df.columns]
+    lower_to_original = {str(column).strip().lower(): column for column in df.columns}
+    id_candidates = ('patient_id', 'patientid', 'patient id', 'id', 'composite_key')
+    id_column = next((lower_to_original[name] for name in id_candidates if name in lower_to_original), None)
+    return df, id_column
+
+@login_required
+@hospital_only
+def predict_patient(request):
+    """Hospital-only individual prediction: manual entry or CSV ID lookup."""
+    error = None
+    result = None
+    lookup_patient_id = ''
+    matched_patient_id = ''
+    csv_fields = []
+    manual_values = request.POST if request.method == 'POST' and request.POST.get('mode') == 'manual_predict' else None
+
+    if request.method == 'POST':
+        mode = request.POST.get('mode', '')
+        if mode == 'manual_predict':
+            try:
+                payload = _hospital_manual_payload(request.POST)
+                label, confidence, probs = predict_one(payload)
+                info = model_info()
+                result = {
+                    'label': DISPLAY_CLASSES.get(label, label),
+                    'raw_label': label,
+                    'confidence': float(confidence),
+                    'confidence_percent': round(float(confidence) * 100, 2),
+                    'probs': [
+                        {'label': DISPLAY_CLASSES.get(k, k), 'value': float(v)}
+                        for k, v in sorted(probs.items(), key=lambda pair: pair[1], reverse=True)
+                    ],
+                    'model_name': info.get('model_name') or info.get('model_type') or 'Global model',
+                    'version': info.get('version', 'v1.0.0'),
+                }
+            except Exception as exc:
+                error = str(exc)
+
+        elif mode == 'csv_lookup':
+            lookup_patient_id = request.POST.get('patient_id', '').strip()
+            uploaded_csv = request.FILES.get('patient_csv')
+            if not uploaded_csv:
+                error = 'Please upload the patient CSV file.'
+            elif not uploaded_csv.name.lower().endswith('.csv'):
+                error = 'Only CSV files are supported.'
+            elif not lookup_patient_id:
+                error = 'Enter a patient ID to search in the CSV.'
+            else:
+                try:
+                    uploaded_csv.seek(0)
+                    df = pd.read_csv(uploaded_csv, dtype=str)
+                    df, id_column = _normalise_csv_columns(df)
+                    if not id_column:
+                        raise ValueError("CSV must contain an identifier column such as 'patient_id' or 'composite_key'.")
+                    matches = df[df[id_column].fillna('').astype(str).str.strip() == lookup_patient_id]
+                    if matches.empty:
+                        raise ValueError(f"No patient with ID '{lookup_patient_id}' was found in column '{id_column}'.")
+                    if len(matches) > 1:
+                        raise ValueError(f"Patient ID '{lookup_patient_id}' appears more than once. Please use a unique ID.")
+                    row = matches.iloc[0]
+                    payload = _payload_from_csv_row(row)
+                    csv_fields = [
+                        {'key': column, 'label': column.replace('_', ' ').replace('HbA1c', 'HbA1c'),
+                         'value': payload[column]}
+                        for column in FEATURES
+                    ]
+                    matched_patient_id = lookup_patient_id
+                    result_payload = json.dumps(payload)
+                except Exception as exc:
+                    error = str(exc)
+                    result_payload = ''
+        elif mode == 'csv_predict':
+            try:
+                raw_payload = request.POST.get('csv_payload', '')
+                payload = json.loads(raw_payload)
+                if not isinstance(payload, dict) or any(key not in payload for key in FEATURES):
+                    raise ValueError('Patient data is incomplete. Please look up the patient again.')
+                # Keep the CSV-derived feature set exactly as present in the source row.
+                for key in FEATURES:
+                    if key in ('age', 'age_normalized', 'bmi', 'HbA1c_level', 'glucose',
+                               'cholesterol', 'sleep_hours', 'triglycerides', 'blood_pressure',
+                               'crp_level', 'homocysteine_level', 'systolic_bp', 'diastolic_bp',
+                               'alcohol_intake', 'salt_intake', 'heart_rate', 'hdl', 'ldl'):
+                        payload[key] = float(payload[key])
+                    else:
+                        payload[key] = str(payload[key])
+                label, confidence, probs = predict_one(payload)
+                info = model_info()
+                result = {
+                    'label': DISPLAY_CLASSES.get(label, label),
+                    'raw_label': label,
+                    'confidence': float(confidence),
+                    'confidence_percent': round(float(confidence) * 100, 2),
+                    'probs': [
+                        {'label': DISPLAY_CLASSES.get(k, k), 'value': float(v)}
+                        for k, v in sorted(probs.items(), key=lambda pair: pair[1], reverse=True)
+                    ],
+                    'model_name': info.get('model_name') or info.get('model_type') or 'Global model',
+                    'version': info.get('version', 'v1.0.0'),
+                    'patient_id': request.POST.get('matched_patient_id', ''),
+                }
+                matched_patient_id = request.POST.get('matched_patient_id', '')
+            except Exception as exc:
+                error = str(exc)
+
+    # Build manual form metadata. Preserve submitted values after validation errors.
+    manual_fields = []
+    for key, label, field_type in HOSPITAL_PREDICTION_FIELDS:
+        manual_fields.append({
+            'key': key,
+            'label': label,
+            'type': field_type,
+            'options': HOSPITAL_PREDICTION_OPTIONS.get(key, []),
+            'value': request.POST.get(key, '') if request.method == 'POST' else '',
+        })
+
+    return render(request, 'hospital/predict_patient.html', {
+        'error': error,
+        'result': result,
+        'manual_fields': manual_fields,
+        'model': model_info(),
+        'lookup_patient_id': lookup_patient_id or request.POST.get('patient_id', ''),
+        'matched_patient_id': matched_patient_id,
+        'csv_fields': csv_fields,
+        'csv_payload': result_payload if request.method == 'POST' and request.POST.get('mode') == 'csv_lookup' and not error else '',
+    })
