@@ -88,3 +88,36 @@ The important persistent records are:
 The Patient Portal does not guess which file to load. `GlobalModel(status='ACTIVE')` is the source of truth. The ML service loads that artifact and caches it until the artifact changes.
 
 Runtime global artifacts are written under `media/`. For production, durable object storage/model registry should be used because many cloud service filesystems are ephemeral.
+
+# Superset Global Model Update
+
+This patch adds a separate Superset Models page to the Admin Portal. It does not replace or overwrite individual GlobalModel versions. It assumes the previously installed Hospital Analytics update and its `0004_submission_analytics_data` migration are already present.
+
+## Files to copy into the project root
+- `hospital/models.py`
+- `hospital/migrations/0005_supersetmodel.py`
+- `services/ml_service.py`
+- `admin_portal/views.py`
+- `admin_portal/urls.py`
+- `templates/base.html`
+- `templates/admin_portal/dashboard.html`
+- `templates/admin_portal/model_history.html`
+- `templates/admin_portal/superset_models.html` (new file)
+
+## Apply and test
+1. Back up the project and database before replacing files.
+2. Copy files preserving these relative paths.
+3. Run `python manage.py migrate`.
+4. Run `python manage.py check`.
+5. Start with `python manage.py runserver`.
+6. Admin Portal → Superset Models → enter a name → select at least two global versions → Create.
+7. The new superset is created as AVAILABLE. Click `Use for Patient Portal` to activate it.
+8. Try a prediction and confirm its saved model version is the superset version. Switch back to any individual global version through Model History.
+
+## Important behaviour
+- A superset concatenates the decision-tree estimators from selected compatible global Random Forest versions. The tree count is the sum of the selected versions' trees.
+- This does not retrain on old datasets or perform weighted/parameter averaging; it combines existing trees.
+- A new global round automatically becomes active and deactivates any active superset, matching the existing round workflow.
+- Activating either a global model or a superset deactivates the other type, so the Patient Portal resolves one selected model.
+- A superset can preserve different rounds' learned splits, but it can also preserve poor trees. Evaluate on a held-out test set before using it for real clinical decisions.
+- Version choices are limited to the GlobalModel records currently stored in the database and compatible model artifacts.

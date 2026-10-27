@@ -6,31 +6,48 @@ class Submission(models.Model):
     STATUS=[('TRAINED','Local model trained'),('SUBMITTED','Submitted to FL round'),('AGGREGATED','Included in global model')]
 
     hospital=models.ForeignKey(User,on_delete=models.CASCADE,related_name='submissions')
+
     filename=models.CharField(max_length=255)
+
     records=models.PositiveIntegerField(default=0)
+
     train_rows=models.PositiveIntegerField(default=0)
+
     validation_rows=models.PositiveIntegerField(default=0)
+
     test_rows=models.PositiveIntegerField(default=0)
+
     class_distribution=models.JSONField(default=dict,blank=True)
+
+    # Persisted dataset analytics added by the earlier Hospital Analytics update.
     analytics_data=models.JSONField(default=dict,blank=True)
+
     accuracy=models.FloatField(null=True,blank=True)
+
     macro_f1=models.FloatField(null=True,blank=True)
+
     trees=models.PositiveIntegerField(default=0)
+
     status=models.CharField(
         max_length=30,
         choices=STATUS,
         default='TRAINED'
     )
+
     round_no=models.PositiveIntegerField(default=1)
+
     model_version=models.CharField(
         max_length=50,
         default='v1.0.0'
     )
+
     artifact_path=models.CharField(
         max_length=500,
         blank=True
     )
+
     created_at=models.DateTimeField(auto_now_add=True)
+
     submitted_at=models.DateTimeField(null=True,blank=True)
 
     class Meta:
@@ -67,3 +84,20 @@ class GlobalModel(models.Model):
                  name='only_one_active_global_model'
             )
         ]
+
+
+class SupersetModel(models.Model):
+    """A separately stored ensemble made by combining selected global versions."""
+    name = models.CharField(max_length=120)
+    version = models.CharField(max_length=30, unique=True)
+    source_versions = models.JSONField(default=list, blank=True)
+    trees = models.PositiveIntegerField(default=0)
+    artifact_path = models.CharField(max_length=500)
+    is_active = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.name} ({self.version})'
